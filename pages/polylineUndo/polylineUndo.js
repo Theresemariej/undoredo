@@ -1,5 +1,6 @@
 import Stack from './stack';
 import Konva from "konva";
+import { calendarFormat } from 'moment';
 import { createMachine, interpret } from "xstate";
 
 const stage = new Konva.Stage({
@@ -17,6 +18,8 @@ stage.add(temporaire);
 
 const MAX_POINTS = 10;
 let polyline // La polyline en cours de construction;
+
+undoManager = new UndoManager;
 
 const polylineMachine = createMachine(
     {
@@ -119,7 +122,18 @@ const polylineMachine = createMachine(
                 polyline.points(newPoints);
                 polyline.stroke("black"); // On change la couleur
                 // On sauvegarde la polyline dans la couche de dessin
-                dessin.add(polyline); // On l'ajoute à la couche de dessin
+
+                //ce q'on fait de base
+                //dessin.add(polyline); // On l'ajoute à la couche de dessin
+
+                //sans le UndoManager:
+                /*commande = new ConcreteCommand(dessin,polyline);
+                commande.execute();*/
+
+                //avec le UndoManager
+                commande = new ConcreteCommand(dessin,polyline);
+                undoManager = executeCommand(commande);
+
             },
             addPoint: (context, event) => {
                 const pos = stage.getPointerPosition();
@@ -175,5 +189,80 @@ window.addEventListener("keydown", (event) => {
 // bouton Undo
 const undoButton = document.getElementById("undo");
 undoButton.addEventListener("click", () => {
-    
+    undoManager.undo();
 });
+
+///////////////////////////////////////////////////////////////////////////////////////////////
+
+//UndoManager doit contenir la pile des commande ( à ajouter, à annuler )
+//c'est lui qui lance l'exécution
+
+class UndoManager{
+    construct(){
+        pileUndo= new Stack();
+        pileRedo= new Stack();
+    }
+
+    canUndo() {
+        if (this.pileUndo.isEmpty()) {
+            return false
+        } else {
+            return true
+        }
+    }
+
+    canRedo() {
+        if (this.pileRedo.isEmpty()) {
+            return false
+        } else {
+            return true
+        }
+    }
+
+    executeCommand(commande){
+        commande.execute()
+        this.pileUndo.push(commande)
+    }
+
+
+    Undo(){
+        if(canUndo()){
+        commande= new ConcreteCommand(polyline, dessin)
+        commande.undo();
+        this.pileRedo.push(commande)
+        }
+    }
+
+
+}
+///////////////////////////////////////////////////////////////////////////////////////////////
+
+//ça sert à rien, c'est juste comme une interface
+class Command{
+    execute(){}
+    undo(){}
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////
+class ConcreteCommand extends Command{
+    
+    //polyline et dessin sont des variables definie en haut. respectivement de type Line et Layer
+    constructor(polyline, dessin) {
+        super();
+        this.polyline = polyline; //polyline
+        this.dessin = dessin;  //dessin
+    }
+    
+    // de base, dans la fonction on a ça:  dessin.add(polyline);
+    execute(){
+        this.dessin.add(this.polyline);
+        }
+
+    
+    undo(){
+        this.polyline.remove();
+    }
+
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////
